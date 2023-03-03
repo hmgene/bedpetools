@@ -238,7 +238,43 @@ usage="Usage: $0 <bedpe> [<min_loops>]
 
 "
 if [ $# -lt 1 ];then echo "$usage";return;fi
+	local tmp=$( mktemp -d );
+	cat $1 | perl -ne 'chomp; my @d=split/\t/,$_; print join("\t",@d[0..5],join("@",@d[6..$#d],$.)),"\n";' > $tmp/a
+	bedtools pairtopair -a $tmp/a -b $tmp/a -type either |\
+	perl -e 'use strict;
+		my %r=(); ## edges
+		while(<STDIN>){chomp;my@d=split/\t/,$_;
+			my @x=split/\@/,$d[6];
+			my @y=split/\@/,$d[13];
+			my ($i,$j)=($x[$#x],$y[$#y]);
+			$r{$i}{$j} ++; $r{$j}{$i} ++;
+		}
+		my %c=(); ## id => cluster id
+		sub findisland{ ## simple DFS
+			my ($i,$x,$y)=@_;
+			if(!defined $y->{$i} ){ 
+				my @z=sort {$b<=>$a} map { $y->{$_} } keys %$y; 
+				$y->{$i} = $z[0] + 1; 
 
+			}
+			foreach my $j ( grep { !defined $y->{$_} } keys %{$x->{$i}} ){
+				$y->{$j} = $y->{$i};
+				findisland($j,$x,$y);
+			}
+		}
+		foreach my $i (keys %r){
+			findisland($i, \%r,\%c);	
+		}
+		#map { print "$_:$c{$_}\n"; } keys %c;
+		open( my $fh,"<","'$tmp/a'") or die "$!";
+		while (<$fh>){chomp; my @d=split/\t/,$_;
+			my @x=split/\@/,$d[6];
+			$d[6]=join("\t",@x[0..($#x-1)]);
+			print join("\t",@d,$c{$x[$#x]}),"\n";
+		}
+		close($fh)
+	'
+	return
         cat $1 | perl -e 'use strict; my $thre='${2:-2}';
         sub order{ my ($xx,$yy)=@_;
                 my @x=split/\t/,$xx;
@@ -291,11 +327,16 @@ if [ $# -lt 1 ];then echo "$usage";return;fi
 }
 
 bedpe-cluster-test(){
-echo "chr1      100     200     chr2    300     400     2
-chr2    300     400     chr3    500     600     2
-chrX    300     400     chrX    500     600     2
-chrX    300     400     chrX    600     700     2
-" | bedpe-cluster - 1
+local tmp=$(mktemp -d );
+echo	"chr1	100	200	chr2	300	400	2
+chr2	300	400	chr3	500	600	2
+chr2	3000	4000	chr3	5000	6000	2
+chrX	300	400	chrX	500	600	2
+chrX	300	400	chrX	600	700	2" > $tmp/a
+echo "input:"
+cat $tmp/a
+echo "output:"
+bedpe-cluster $tmp/a 1
 }
 
 

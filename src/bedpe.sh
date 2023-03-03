@@ -13,10 +13,12 @@ bedpe-count(){
         map { print $_,"\t",$r{$_}{s},"\n"; } keys %r;
         '
 }
-#echo	"chr1	100	200	chr1	300	400	1
-#chr1	100	200	chr1	400	500	2"	>	tmp.a
-#echo	"chr1	100	200	chr1	300	500"	>	tmp.b
-#bedpe-count  tmp.a tmp.b
+bedpe-count-test(){
+bedpe-count \
+<( echo	"chr1	100	200	chr1	300	400	1
+chr1	100	200	chr1	400	500	2" )  \
+<( echo	"chr1	100	200	chr1	300	500") 
+}
 
 bedpe-count-bed(){
         cat $1 | perl -ne 'chomp;my@d=split/\t/,$_;
